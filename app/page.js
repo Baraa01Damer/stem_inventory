@@ -118,6 +118,15 @@ export default function Home() {
           </Stack>
         </Box>
       </Modal>
+      <Box mb={4} display="flex" justifyContent="center">
+        <Image 
+          src="/stem-heroes-logo.png"
+          alt="STEM Heroes Academy Logo"
+          width={274}
+          height={189}
+          priority
+        />
+      </Box>
       <Button
         variant="contained"
         onClick={() => {
