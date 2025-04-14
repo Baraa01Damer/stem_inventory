@@ -1,11 +1,4 @@
-import {
-  ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from '@clerk/nextjs'
+import { ClerkProvider, SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 
@@ -21,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: 'STEM Academy Inventory',
-  description: 'Inventory Management System for STEM Academy',
+  description: 'Inventory Management App for STEM Academy',
 }
 
 export default function RootLayout({ children }) {
@@ -38,6 +31,7 @@ export default function RootLayout({ children }) {
           footerActionLink: 'text-blue-600 hover:text-blue-700',
         }
       }}
+      afterSignOutUrl="/"
     >
       <html lang="en">
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
@@ -47,7 +41,7 @@ export default function RootLayout({ children }) {
               <SignUpButton mode="modal" />
             </SignedOut>
             <SignedIn>
-              <UserButton afterSignOutUrl="/" />
+              <UserButton />
             </SignedIn>
           </header>
           {children}

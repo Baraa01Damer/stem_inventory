@@ -3,21 +3,15 @@ import Image from "next/image";
 import { useState, useEffect } from "react"
 import { firestore } from "@/firebase"
 import { Box, Button, Modal, Stack, TextField, Typography } from "@mui/material"
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  query,
-  getDoc,
-  setDoc,
-} from "firebase/firestore"
+import { collection, deleteDoc, doc, getDocs, query, getDoc, setDoc } from "firebase/firestore"
 
 export default function Home() {
+  // State management for inventory items, modal visibility, and new item name
   const [inventory, setInventory] = useState([])
   const [open, setOpen] = useState(false)
   const [itemName, setItemName] = useState("")
 
+  // Function to fetch and update the inventory from Firebase
   const updateInventory = async () => {
     const snapshot = query(collection(firestore, "inventory"))
     const docs = await getDocs(snapshot)
@@ -31,6 +25,7 @@ export default function Home() {
     setInventory(inventoryList)
   }
 
+  // Add a new item or change quantity if item exists
   const addItem = async (item) => {
     const docRef = doc(collection(firestore, "inventory"), item)
     const docSnap = await getDoc(docRef)
@@ -45,6 +40,7 @@ export default function Home() {
     await updateInventory()
   }
 
+  // Remove an item or decrement quantity
   const removeItem = async (item) => {
     const docRef = doc(collection(firestore, "inventory"), item)
     const docSnap = await getDoc(docRef)
@@ -61,14 +57,17 @@ export default function Home() {
     await updateInventory()
   }
 
+  // Fetch inventory data when component mounts
   useEffect(() => {
     updateInventory()
   }, [])
 
+  // Modal control functions
   const handleOpen = () => setOpen(true)
   const handleClose = () => setOpen(false)
 
   return (
+    // Main container with centered content
     <Box
       width="100vw"
       height="100vh"
@@ -78,6 +77,7 @@ export default function Home() {
       alignItems="center"
       gap={2}
     >
+      {/* Modal for adding new items */}
       <Modal open={open} onClose={handleClose}>
         <Box
           position="absolute"
@@ -118,8 +118,10 @@ export default function Home() {
           </Stack>
         </Box>
       </Modal>
+
+      {/* Logo */}
       <Box mb={4} display="flex" justifyContent="center">
-        <Image 
+        <Image
           src="/stem-heroes-logo.png"
           alt="STEM Heroes Academy Logo"
           width={274}
@@ -127,6 +129,8 @@ export default function Home() {
           priority
         />
       </Box>
+
+      {/* Add New Item button */}
       <Button
         variant="contained"
         onClick={() => {
@@ -135,7 +139,10 @@ export default function Home() {
       >
         Add New Item
       </Button>
+
+      {/* Inventory display section */}
       <Box border="1px solid #333">
+        {/* Inventory header */}
         <Box
           width="800px"
           height="100px"
@@ -145,9 +152,11 @@ export default function Home() {
           justifyContent="center"
         >
           <Typography variant="h2" color="#333">
-            Inventory Items
+            Inventory
           </Typography>
         </Box>
+
+        {/* Inventory items list */}
         <Stack width="800px" height="300px" spacing={2} overflow="auto">
           {inventory.map(({ name, quantity }) => (
             <Box
@@ -160,12 +169,15 @@ export default function Home() {
               bgcolor="#f0f0f0"
               padding={5}
             >
+              {/* Item name with capitalized first letter */}
               <Typography variant="h3" color="#333" textAlign="center">
                 {name.charAt(0).toUpperCase() + name.slice(1)}
               </Typography>
+              {/* Item quantity */}
               <Typography variant="h3" color="#333" textAlign="center">
                 {quantity}
               </Typography>
+              {/* Remove item button */}
               <Button
                 variant="contained"
                 onClick={() => {
