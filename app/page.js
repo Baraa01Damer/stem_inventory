@@ -11,6 +11,11 @@ export default function Home() {
   const [inventory, setInventory] = useState([])
   const [open, setOpen] = useState(false)
   const [itemName, setItemName] = useState("")
+  const [itemQuantity, setItemQuantity] = useState(1)
+  const [roomLocation, setRoomLocation] = useState("")
+  const [boxNumber, setBoxNumber] = useState("")
+  const [isEditing, setIsEditing] = useState(false)
+  const [originalName, setOriginalName] = useState("")
 
   // Function to fetch and update the inventory from Firebase
   const updateInventory = async () => {
@@ -26,18 +31,23 @@ export default function Home() {
     setInventory(inventoryList)
   }
 
-  // Add a new item or change quantity if item exists
+  // Add a new item or update if item exists
   const addItem = async (item) => {
     const docRef = doc(collection(firestore, "inventory"), item)
     const docSnap = await getDoc(docRef)
 
-    if (docSnap.exists()) {
-      const { quantity } = docSnap.data()
-      await setDoc(docRef, { quantity: quantity + 1 })
-    } else {
-      await setDoc(docRef, { quantity: 1 })
-    }
+    await setDoc(docRef, {
+      quantity: itemQuantity,
+      roomLocation: roomLocation,
+      boxNumber: boxNumber
+    })
 
+    // Reset form fields
+    setItemName("")
+    setItemQuantity(1)
+    setRoomLocation("")
+    setBoxNumber("")
+    
     await updateInventory()
   }
 
@@ -65,7 +75,46 @@ export default function Home() {
 
   // Modal control functions
   const handleOpen = () => setOpen(true)
-  const handleClose = () => setOpen(false)
+  const handleClose = () => {
+    setOpen(false)
+    setIsEditing(false)
+    setItemName("")
+    setItemQuantity(1)
+    setRoomLocation("")
+    setBoxNumber("")
+    setOriginalName("")
+  }
+
+  const handleEdit = (item) => {
+    setItemName(item.name)
+    setItemQuantity(item.quantity)
+    setRoomLocation(item.roomLocation)
+    setBoxNumber(item.boxNumber || "")
+    setOriginalName(item.name)
+    setIsEditing(true)
+    setOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (isEditing) {
+      // Delete the old document if name changed
+      if (originalName !== itemName) {
+        const oldDocRef = doc(collection(firestore, "inventory"), originalName)
+        await deleteDoc(oldDocRef)
+      }
+    }
+
+    // Add/Update the item
+    const docRef = doc(collection(firestore, "inventory"), itemName)
+    await setDoc(docRef, {
+      quantity: itemQuantity,
+      roomLocation: roomLocation,
+      boxNumber: boxNumber
+    })
+
+    handleClose()
+    await updateInventory()
+  }
 
   return (
     <Box
@@ -115,25 +164,44 @@ export default function Home() {
               transform: "translate(-50%, -50%)"
             }}
           >
-            <Typography variant="h6">Add Item</Typography>
-            <Stack width="100%" direction="row" spacing={2}>
+            <Typography variant="h6">{isEditing ? "Edit Item" : "Add Item"}</Typography>
+            <Stack width="100%" spacing={2}>
               <TextField
+                label="Item Name"
                 variant="outlined"
                 fullWidth
                 value={itemName}
-                onChange={(e) => {
-                  setItemName(e.target.value)
-                }}
+                onChange={(e) => setItemName(e.target.value)}
+              />
+              <TextField
+                label="Quantity"
+                type="number"
+                variant="outlined"
+                fullWidth
+                value={itemQuantity}
+                onChange={(e) => setItemQuantity(parseInt(e.target.value) || 1)}
+                InputProps={{ inputProps: { min: 1 } }}
+              />
+              <TextField
+                label="Room Location"
+                variant="outlined"
+                fullWidth
+                value={roomLocation}
+                onChange={(e) => setRoomLocation(e.target.value)}
+              />
+              <TextField
+                label="Box Number (optional)"
+                variant="outlined"
+                fullWidth
+                value={boxNumber}
+                onChange={(e) => setBoxNumber(e.target.value)}
               />
               <Button
-                variant="outlined"
-                onClick={() => {
-                  addItem(itemName)
-                  setItemName("")
-                  handleClose()
-                }}
+                variant="contained"
+                onClick={handleSave}
+                disabled={!itemName || !roomLocation}
               >
-                Add
+                {isEditing ? "Save Changes" : "Add Item"}
               </Button>
             </Stack>
           </Box>
@@ -179,17 +247,33 @@ export default function Home() {
                 p={2}
                 borderBottom="1px solid #333"
               >
-                <Typography>{item.name}</Typography>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="bold">{item.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Room: {item.roomLocation}
+                    {item.boxNumber && ` • Box: ${item.boxNumber}`}
+                  </Typography>
+                </Box>
                 <Box display="flex" alignItems="center" gap={2}>
                   <Typography>Quantity: {item.quantity}</Typography>
-                  <Button
-                    variant="outlined"
-                    onClick={() => {
-                      removeItem(item.name)
-                    }}
-                  >
-                    Remove
-                  </Button>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      onClick={() => handleEdit(item)}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={() => {
+                        removeItem(item.name)
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </Stack>
                 </Box>
               </Box>
             ))}
