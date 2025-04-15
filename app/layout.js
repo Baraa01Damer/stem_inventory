@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata = {
   title: 'STEM Academy Inventory',
-  description: 'Inventory Management App for STEM Academy',
+  description: 'Inventory Management App for STEM Heroes Academy',
 }
 
 export default function RootLayout({ children }) {
