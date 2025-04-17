@@ -16,6 +16,7 @@ export default function Home() {
   const [boxNumber, setBoxNumber] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [originalName, setOriginalName] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
 
   // Function to fetch and update the inventory from Firebase
   const updateInventory = async () => {
@@ -57,11 +58,14 @@ export default function Home() {
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
-      const { quantity } = docSnap.data()
-      if (quantity == 1) {
+      const data = docSnap.data()
+      if (data.quantity == 1) {
         await deleteDoc(docRef)
       } else {
-        await setDoc(docRef, { quantity: quantity - 1 })
+        await setDoc(docRef, { 
+          ...data,
+          quantity: data.quantity - 1 
+        })
       }
     }
 
@@ -225,10 +229,20 @@ export default function Home() {
             height="100px"
             bgcolor="#ADD8E6"
             display="flex"
+            flexDirection="column"
             justifyContent="center"
             alignItems="center"
+            gap={2}
           >
             <Typography variant="h4">Inventory</Typography>
+            <TextField
+              placeholder="Search items..."
+              variant="outlined"
+              size="small"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              sx={{ width: '300px', bgcolor: 'white' }}
+            />
           </Box>
           {/* Inventory items */}
           <Box
@@ -238,7 +252,13 @@ export default function Home() {
             display="flex"
             flexDirection="column"
           >
-            {inventory.map((item) => (
+            {inventory
+              .filter(item => 
+                item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.roomLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (item.boxNumber && item.boxNumber.toLowerCase().includes(searchTerm.toLowerCase()))
+              )
+              .map((item) => (
               <Box
                 key={item.name}
                 display="flex"
