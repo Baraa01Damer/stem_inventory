@@ -234,7 +234,7 @@ export default function Home() {
             <Stack spacing={2}>
               <Typography variant="h6">Adding Items</Typography>
               <Typography>
-                1. Click the "Add New Item" button
+                1. Click the &quot;Add New Item&quot; button
                 <br />
                 2. Fill in the item details:
                 <br />
@@ -246,16 +246,16 @@ export default function Home() {
                 <br />
                 - Box Number (optional)
                 <br />
-                3. Click "Add Item" to save
+                3. Click &quot;Add Item&quot; to save
               </Typography>
 
               <Typography variant="h6">Managing Items</Typography>
               <Typography>
-                <strong>Edit:</strong> Click the "Edit" button to modify item details
+                <strong>Edit:</strong> Click the &quot;Edit&quot; button to modify item details
                 <br />
-                <strong>Remove:</strong> Click "Remove" to decrease quantity by 1
+                <strong>Remove:</strong> Click &quot;Remove&quot; to decrease quantity by 1
                 <br />
-                <strong>Delete All:</strong> Click "Delete All" to remove the entire item entry
+                <strong>Delete All:</strong> Click &quot;Delete All&quot; to remove the entire item entry
                 <br />
                 (!!!Keep in mind that this will remove ALL entries for that item!!!)
               </Typography>
@@ -299,7 +299,7 @@ export default function Home() {
           >
             <Typography variant="h6">Confirm Delete</Typography>
             <Typography>
-              Are you sure you want to delete the entire entry for "{itemToDelete?.name}"?
+              Are you sure you want to delete the entire entry for &quot;{itemToDelete?.name}&quot;?
               This action cannot be undone.
             </Typography>
             <Stack direction="row" spacing={2} justifyContent="flex-end">
