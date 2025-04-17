@@ -10,6 +10,12 @@ export default function Home() {
   // State management for inventory items, modal visibility, and new item name
   const [inventory, setInventory] = useState([])
   const [open, setOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState(null)
+  const [itemToRemove, setItemToRemove] = useState(null)
+  const [helpModalOpen, setHelpModalOpen] = useState(false)
+  const [language, setLanguage] = useState('en')
   const [itemName, setItemName] = useState("")
   const [itemQuantity, setItemQuantity] = useState(1)
   const [roomLocation, setRoomLocation] = useState("")
@@ -48,7 +54,7 @@ export default function Home() {
     setItemQuantity(1)
     setRoomLocation("")
     setBoxNumber("")
-    
+
     await updateInventory()
   }
 
@@ -60,16 +66,38 @@ export default function Home() {
     if (docSnap.exists()) {
       const data = docSnap.data()
       if (data.quantity == 1) {
-        await deleteDoc(docRef)
+        setItemToRemove(item)
+        setRemoveConfirmOpen(true)
       } else {
-        await setDoc(docRef, { 
+        await setDoc(docRef, {
           ...data,
-          quantity: data.quantity - 1 
+          quantity: data.quantity - 1
         })
+        await updateInventory()
       }
     }
+  }
 
+  const handleRemoveConfirm = async () => {
+    const docRef = doc(collection(firestore, "inventory"), itemToRemove)
+    await deleteDoc(docRef)
     await updateInventory()
+    setRemoveConfirmOpen(false)
+    setItemToRemove(null)
+  }
+
+  const handleRemoveCancel = () => {
+    setRemoveConfirmOpen(false)
+    setItemToRemove(null)
+  }
+
+  // Function to delete an entire entry
+  const deleteEntry = async (item) => {
+    const docRef = doc(collection(firestore, "inventory"), item.name)
+    await deleteDoc(docRef)
+    await updateInventory()
+    setDeleteConfirmOpen(false)
+    setItemToDelete(null)
   }
 
   // Fetch inventory data when component mounts
@@ -120,6 +148,18 @@ export default function Home() {
     await updateInventory()
   }
 
+  const handleDeleteConfirm = (item) => {
+    setItemToDelete(item)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmOpen(false)
+    setItemToDelete(null)
+  }
+
+  const handleHelpClose = () => setHelpModalOpen(false)
+
   return (
     <Box
       width="100vw"
@@ -150,6 +190,163 @@ export default function Home() {
 
       {/* Show inventory for authenticated users */}
       <SignedIn>
+        {/* Help Button */}
+        <Button
+          variant="contained"
+          onClick={() => setHelpModalOpen(true)}
+          sx={{
+            position: 'fixed',
+            bottom: 20,
+            right: 20,
+            borderRadius: '50%',
+            minWidth: '40px',
+            width: '40px',
+            height: '40px',
+            padding: 0,
+            backgroundColor: '#1976d2',
+            '&:hover': {
+              backgroundColor: '#1565c0',
+            }
+          }}
+        >
+          ?
+        </Button>
+
+        {/* Help Modal */}
+        <Modal open={helpModalOpen} onClose={handleHelpClose}>
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            width={600}
+            bgcolor="white"
+            border="2px solid #000"
+            boxShadow={24}
+            p={4}
+            display="flex"
+            flexDirection="column"
+            gap={3}
+            sx={{
+              transform: "translate(-50%, -50%)"
+            }}
+          >
+            <Typography variant="h5" textAlign="center">Tutorial</Typography>
+            <Stack spacing={2}>
+              <Typography variant="h6">Adding Items</Typography>
+              <Typography>
+                1. Click the "Add New Item" button
+                <br />
+                2. Fill in the item details:
+                <br />
+                - Item Name
+                <br />
+                - Quantity
+                <br />
+                - Room Location
+                <br />
+                - Box Number (optional)
+                <br />
+                3. Click "Add Item" to save
+              </Typography>
+
+              <Typography variant="h6">Managing Items</Typography>
+              <Typography>
+                <strong>Edit:</strong> Click the "Edit" button to modify item details
+                <br />
+                <strong>Remove:</strong> Click "Remove" to decrease quantity by 1
+                <br />
+                <strong>Delete All:</strong> Click "Delete All" to remove the entire item entry
+                <br />
+                (!!!Keep in mind that this will remove ALL entries for that item!!!)
+              </Typography>
+
+              <Typography variant="h6">Searching</Typography>
+              <Typography>
+                Use the search bar at the top of the inventory to filter items by name, room location, or box number.
+              </Typography>
+              <Typography variant="h6">Other Inquiries</Typography>
+              <Typography>
+                Let me (Baraa) know if you have any questions, feedback, suggestions. JazakAllah Khair!
+              </Typography>
+            </Stack>
+            <Button
+              variant="contained"
+              onClick={handleHelpClose}
+              sx={{ mt: 2 }}
+            >
+              Got it!
+            </Button>
+          </Box>
+        </Modal>
+
+        {/* Delete Confirmation Modal */}
+        <Modal open={deleteConfirmOpen} onClose={handleDeleteCancel}>
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            width={400}
+            bgcolor="white"
+            border="2px solid #000"
+            boxShadow={24}
+            p={4}
+            display="flex"
+            flexDirection="column"
+            gap={3}
+            sx={{
+              transform: "translate(-50%, -50%)"
+            }}
+          >
+            <Typography variant="h6">Confirm Delete</Typography>
+            <Typography>
+              Are you sure you want to delete the entire entry for "{itemToDelete?.name}"?
+              This action cannot be undone.
+            </Typography>
+            <Stack direction="row" spacing={2} justifyContent="flex-end">
+              <Button variant="outlined" onClick={handleDeleteCancel}>
+                Cancel
+              </Button>
+              <Button variant="contained" color="error" onClick={() => deleteEntry(itemToDelete)}>
+                Delete
+              </Button>
+            </Stack>
+          </Box>
+        </Modal>
+
+        {/* Remove Confirmation Modal */}
+        <Modal open={removeConfirmOpen} onClose={handleRemoveCancel}>
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            width={400}
+            bgcolor="white"
+            border="2px solid #000"
+            boxShadow={24}
+            p={4}
+            display="flex"
+            flexDirection="column"
+            gap={3}
+            sx={{
+              transform: "translate(-50%, -50%)"
+            }}
+          >
+            <Typography variant="h6">Confirm Remove</Typography>
+            <Typography>
+              Removing this item will delete it from the inventory since its quantity is 1.
+              Are you sure you want to proceed?
+            </Typography>
+            <Stack direction="row" spacing={2} justifyContent="flex-end">
+              <Button variant="outlined" onClick={handleRemoveCancel}>
+                Cancel
+              </Button>
+              <Button variant="contained" color="error" onClick={handleRemoveConfirm}>
+                Remove
+              </Button>
+            </Stack>
+          </Box>
+        </Modal>
+
         {/* Modal for adding new items */}
         <Modal open={open} onClose={handleClose}>
           <Box
@@ -253,50 +450,57 @@ export default function Home() {
             flexDirection="column"
           >
             {inventory
-              .filter(item => 
+              .filter(item =>
                 item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.roomLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (item.boxNumber && item.boxNumber.toLowerCase().includes(searchTerm.toLowerCase()))
               )
               .map((item) => (
-              <Box
-                key={item.name}
-                display="flex"
-                justifyContent="space-between"
-                alignItems="center"
-                p={2}
-                borderBottom="1px solid #333"
-              >
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="bold">{item.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Room: {item.roomLocation}
-                    {item.boxNumber && ` • Box: ${item.boxNumber}`}
-                  </Typography>
+                <Box
+                  key={item.name}
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  p={2}
+                  borderBottom="1px solid #333"
+                >
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight="bold">{item.name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Room: {item.roomLocation}
+                      {item.boxNumber && ` • Box: ${item.boxNumber}`}
+                    </Typography>
+                  </Box>
+                  <Box display="flex" alignItems="center" gap={2}>
+                    <Typography>Quantity: {item.quantity}</Typography>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={() => handleEdit(item)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => {
+                          removeItem(item.name)
+                        }}
+                      >
+                        Remove
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleDeleteConfirm(item)}
+                      >
+                        Delete All
+                      </Button>
+                    </Stack>
+                  </Box>
                 </Box>
-                <Box display="flex" alignItems="center" gap={2}>
-                  <Typography>Quantity: {item.quantity}</Typography>
-                  <Stack direction="row" spacing={1}>
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      onClick={() => handleEdit(item)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      onClick={() => {
-                        removeItem(item.name)
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  </Stack>
-                </Box>
-              </Box>
-            ))}
+              ))}
           </Box>
         </Box>
       </SignedIn>
