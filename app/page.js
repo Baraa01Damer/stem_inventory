@@ -17,7 +17,7 @@ export default function Home() {
   const [helpModalOpen, setHelpModalOpen] = useState(false)
   const [language, setLanguage] = useState('en')
   const [itemName, setItemName] = useState("")
-  const [itemQuantity, setItemQuantity] = useState(1)
+  const [itemQuantity, setItemQuantity] = useState("")
   const [roomLocation, setRoomLocation] = useState("")
   const [boxNumber, setBoxNumber] = useState("")
   const [isEditing, setIsEditing] = useState(false)
@@ -60,7 +60,7 @@ export default function Home() {
 
     // Reset form fields
     setItemName("")
-    setItemQuantity(1)
+    setItemQuantity("")
     setRoomLocation("")
     setBoxNumber("")
 
@@ -120,7 +120,7 @@ export default function Home() {
     setOpen(false)
     setIsEditing(false)
     setItemName("")
-    setItemQuantity(1)
+    setItemQuantity("")
     setRoomLocation("")
     setBoxNumber("")
     setOriginalName("")
@@ -389,8 +389,7 @@ export default function Home() {
                 variant="outlined"
                 fullWidth
                 value={itemQuantity}
-                onChange={(e) => setItemQuantity(parseInt(e.target.value) || 1)}
-                InputProps={{ inputProps: { min: 1 } }}
+                onChange={(e) => setItemQuantity(e.target.value)}
               />
               <Autocomplete
                 freeSolo
