@@ -53,7 +53,7 @@ export default function Home() {
     const docSnap = await getDoc(docRef)
 
     await setDoc(docRef, {
-      quantity: itemQuantity,
+      quantity: itemQuantity === "MANY" ? "MANY" : parseInt(itemQuantity),
       roomLocation: roomLocation,
       boxNumber: boxNumber
     })
@@ -74,7 +74,7 @@ export default function Home() {
 
     if (docSnap.exists()) {
       const data = docSnap.data()
-      if (data.quantity == 1) {
+      if (data.quantity === "MANY" || data.quantity == 1) {
         setItemToRemove(item)
         setRemoveConfirmOpen(true)
       } else {
@@ -385,11 +385,22 @@ export default function Home() {
               />
               <TextField
                 label="Quantity"
-                type="number"
+                type="text"
                 variant="outlined"
                 fullWidth
                 value={itemQuantity}
                 onChange={(e) => setItemQuantity(e.target.value)}
+                InputProps={{
+                  endAdornment: (
+                    <Button
+                      size="small"
+                      onClick={() => setItemQuantity("MANY")}
+                      sx={{ ml: 1 }}
+                    >
+                      MANY
+                    </Button>
+                  ),
+                }}
               />
               <Autocomplete
                 freeSolo
