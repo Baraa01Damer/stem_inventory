@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { useState, useEffect } from "react"
 import { firestore } from "@/firebase"
-import { Box, Button, Modal, Stack, TextField, Typography } from "@mui/material"
+import { Box, Button, Modal, Stack, TextField, Typography, Autocomplete } from "@mui/material"
 import { collection, deleteDoc, doc, getDocs, query, getDoc, setDoc } from "firebase/firestore"
 import { SignedIn, SignedOut } from "@clerk/nextjs"
 
@@ -23,6 +23,15 @@ export default function Home() {
   const [isEditing, setIsEditing] = useState(false)
   const [originalName, setOriginalName] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
+
+  const roomLocations = [
+    "Breakout",
+    "Computer Lab (Bot Spot)",
+    "Hub",
+    "Kitchen",
+    "Maker Space",
+    "Pixel Place"
+  ]
 
   // Function to fetch and update the inventory from Firebase
   const updateInventory = async () => {
@@ -383,12 +392,19 @@ export default function Home() {
                 onChange={(e) => setItemQuantity(parseInt(e.target.value) || 1)}
                 InputProps={{ inputProps: { min: 1 } }}
               />
-              <TextField
-                label="Room Location"
-                variant="outlined"
-                fullWidth
+              <Autocomplete
+                freeSolo
+                options={roomLocations}
                 value={roomLocation}
-                onChange={(e) => setRoomLocation(e.target.value)}
+                onChange={(event, newValue) => setRoomLocation(newValue || "")}
+                onInputChange={(event, newInputValue) => setRoomLocation(newInputValue)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Room Location"
+                    required
+                  />
+                )}
               />
               <TextField
                 label="Box Number (optional)"
