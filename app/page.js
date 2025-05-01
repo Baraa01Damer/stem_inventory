@@ -4,33 +4,37 @@ import { useState, useEffect } from "react"
 import { firestore } from "@/firebase"
 import { Box, Button, Modal, Stack, TextField, Typography, Autocomplete } from "@mui/material"
 import { collection, deleteDoc, doc, getDocs, query, getDoc, setDoc } from "firebase/firestore"
-import { SignedIn, SignedOut } from "@clerk/nextjs"
+import { SignedIn, SignedOut, useUser } from "@clerk/nextjs"
+import { GoHistory } from "react-icons/go"
 
 export default function Home() {
   // State management for inventory items, modal visibility, and new item name
   const [inventory, setInventory] = useState([])
   const [open, setOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState(null)
-  const [itemToRemove, setItemToRemove] = useState(null)
   const [helpModalOpen, setHelpModalOpen] = useState(false)
   const [language, setLanguage] = useState('en')
   const [itemName, setItemName] = useState("")
   const [itemQuantity, setItemQuantity] = useState("")
   const [roomLocation, setRoomLocation] = useState("")
   const [boxNumber, setBoxNumber] = useState("")
+  const [notes, setNotes] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [originalName, setOriginalName] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
+  const [sortBy, setSortBy] = useState("name")
+  const [historyModalOpen, setHistoryModalOpen] = useState(false)
+  const [selectedItemHistory, setSelectedItemHistory] = useState(null)
+  const { user } = useUser()
 
   const roomLocations = [
-    "Breakout",
+    "Big Classroom (Pixel Place)",
+    "Breakout Room",
     "Computer Lab (Bot Spot)",
     "Hub",
     "Kitchen",
-    "Maker Space",
-    "Pixel Place"
+    "Maker Space"
   ]
 
   // Function to fetch and update the inventory from Firebase
@@ -52,10 +56,23 @@ export default function Home() {
     const docRef = doc(collection(firestore, "inventory"), item)
     const docSnap = await getDoc(docRef)
 
-    await setDoc(docRef, {
+    const itemData = {
       quantity: itemQuantity === "MANY" ? "MANY" : parseInt(itemQuantity),
       roomLocation: roomLocation,
-      boxNumber: boxNumber
+      boxNumber: boxNumber,
+      notes: notes,
+      lastModified: new Date().toISOString()
+    }
+
+    await setDoc(docRef, itemData)
+
+    // Add history entry
+    const historyRef = doc(collection(firestore, `inventory/${item}/history`), new Date().toISOString())
+    await setDoc(historyRef, {
+      action: docSnap.exists() ? "update" : "create",
+      by: user.fullName || user.username,
+      timestamp: new Date().toISOString(),
+      changes: itemData
     })
 
     // Reset form fields
@@ -63,41 +80,9 @@ export default function Home() {
     setItemQuantity("")
     setRoomLocation("")
     setBoxNumber("")
+    setNotes("")
 
     await updateInventory()
-  }
-
-  // Remove an item or decrement quantity
-  const removeItem = async (item) => {
-    const docRef = doc(collection(firestore, "inventory"), item)
-    const docSnap = await getDoc(docRef)
-
-    if (docSnap.exists()) {
-      const data = docSnap.data()
-      if (data.quantity === "MANY" || data.quantity == 1) {
-        setItemToRemove(item)
-        setRemoveConfirmOpen(true)
-      } else {
-        await setDoc(docRef, {
-          ...data,
-          quantity: data.quantity - 1
-        })
-        await updateInventory()
-      }
-    }
-  }
-
-  const handleRemoveConfirm = async () => {
-    const docRef = doc(collection(firestore, "inventory"), itemToRemove)
-    await deleteDoc(docRef)
-    await updateInventory()
-    setRemoveConfirmOpen(false)
-    setItemToRemove(null)
-  }
-
-  const handleRemoveCancel = () => {
-    setRemoveConfirmOpen(false)
-    setItemToRemove(null)
   }
 
   // Function to delete an entire entry
@@ -123,6 +108,7 @@ export default function Home() {
     setItemQuantity("")
     setRoomLocation("")
     setBoxNumber("")
+    setNotes("")
     setOriginalName("")
   }
 
@@ -131,26 +117,49 @@ export default function Home() {
     setItemQuantity(item.quantity)
     setRoomLocation(item.roomLocation)
     setBoxNumber(item.boxNumber || "")
+    setNotes(item.notes || "")
     setOriginalName(item.name)
     setIsEditing(true)
     setOpen(true)
   }
 
   const handleSave = async () => {
+    const itemData = {
+      quantity: itemQuantity,
+      roomLocation: roomLocation,
+      boxNumber: boxNumber,
+      notes: notes,
+      lastModified: new Date().toISOString()
+    }
+
     if (isEditing) {
       // Delete the old document if name changed
       if (originalName !== itemName) {
         const oldDocRef = doc(collection(firestore, "inventory"), originalName)
         await deleteDoc(oldDocRef)
+        
+        // Add history entry for deletion of old name
+        const oldHistoryRef = doc(collection(firestore, `inventory/${originalName}/history`), new Date().toISOString())
+        await setDoc(oldHistoryRef, {
+          action: "rename",
+          by: user.fullName || user.username,
+          timestamp: new Date().toISOString(),
+          newName: itemName
+        })
       }
     }
 
     // Add/Update the item
     const docRef = doc(collection(firestore, "inventory"), itemName)
-    await setDoc(docRef, {
-      quantity: itemQuantity,
-      roomLocation: roomLocation,
-      boxNumber: boxNumber
+    await setDoc(docRef, itemData)
+
+    // Add history entry
+    const historyRef = doc(collection(firestore, `inventory/${itemName}/history`), new Date().toISOString())
+    await setDoc(historyRef, {
+      action: isEditing ? "update" : "create",
+      by: user.fullName || user.username,
+      timestamp: new Date().toISOString(),
+      changes: itemData
     })
 
     handleClose()
@@ -169,18 +178,65 @@ export default function Home() {
 
   const handleHelpClose = () => setHelpModalOpen(false)
 
+  const handleHistoryClick = async (item) => {
+    const historyRef = collection(firestore, `inventory/${item.name}/history`)
+    const historySnapshot = await getDocs(historyRef)
+    const history = []
+    historySnapshot.forEach((doc) => {
+      history.push({
+        id: doc.id,
+        ...doc.data()
+      })
+    })
+    setSelectedItemHistory({ name: item.name, history: history.sort((a, b) => b.timestamp.localeCompare(a.timestamp)) })
+    setHistoryModalOpen(true)
+  }
+
+  const handleHistoryClose = () => {
+    setHistoryModalOpen(false)
+    setSelectedItemHistory(null)
+  }
+
+  // Add sorting function
+  const getSortedInventory = (items) => {
+    return [...items].sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return a.name.localeCompare(b.name)
+        case "room":
+          return a.roomLocation.localeCompare(b.roomLocation)
+        case "quantity":
+          // Handle "MANY" case and convert to numbers for comparison
+          if (a.quantity === "MANY" && b.quantity === "MANY") return 0
+          if (a.quantity === "MANY") return 1
+          if (b.quantity === "MANY") return -1
+          return parseInt(a.quantity) - parseInt(b.quantity)
+        case "recent":
+          // Sort by lastModified timestamp, most recent first
+          const dateA = a.lastModified ? new Date(a.lastModified) : new Date(0)
+          const dateB = b.lastModified ? new Date(b.lastModified) : new Date(0)
+          return dateB - dateA
+        default:
+          return 0
+      }
+    })
+  }
+
   return (
     <Box
-      width="100vw"
-      height="100vh"
+      width="100%"
+      minHeight="100vh"
       display="flex"
       flexDirection="column"
-      justifyContent="center"
       alignItems="center"
       gap={2}
+      sx={{
+        overflowY: 'auto',
+        pb: 8, // Add padding at bottom to account for help button
+      }}
     >
       {/* Logo - shown for both authenticated and unauthenticated users */}
-      <Box mb={4} display="flex" justifyContent="center">
+      <Box mt={4} mb={4} display="flex" justifyContent="center">
         <Image
           src="/stem-heroes-logo.png"
           alt="STEM Heroes Academy Logo"
@@ -255,6 +311,8 @@ export default function Home() {
                 <br />
                 - Box Number (optional)
                 <br />
+                - Note (optional)
+                <br />
                 3. Click &quot;Add Item&quot; to save
               </Typography>
 
@@ -262,11 +320,9 @@ export default function Home() {
               <Typography>
                 <strong>Edit:</strong> Click the &quot;Edit&quot; button to modify item details
                 <br />
-                <strong>Remove:</strong> Click &quot;Remove&quot; to decrease quantity by 1
+                <strong>Delete:</strong> Click &quot;Delete&quot; to remove the entire item entry
                 <br />
-                <strong>Delete All:</strong> Click &quot;Delete All&quot; to remove the entire item entry
-                <br />
-                (!!!Keep in mind that this will remove ALL entries for that item!!!)
+                (Keep in mind that this will remove ALL entries for that item)
               </Typography>
 
               <Typography variant="h6">Searching</Typography>
@@ -275,7 +331,7 @@ export default function Home() {
               </Typography>
               <Typography variant="h6">Other Inquiries</Typography>
               <Typography>
-                Let me (Baraa) know if you have any questions, feedback, suggestions. JazakAllah Khair!
+                Let me (Baraa) know if you have any questions, feedback, and/or suggestions.
               </Typography>
             </Stack>
             <Button
@@ -322,13 +378,13 @@ export default function Home() {
           </Box>
         </Modal>
 
-        {/* Remove Confirmation Modal */}
-        <Modal open={removeConfirmOpen} onClose={handleRemoveCancel}>
+        {/* History Modal */}
+        <Modal open={historyModalOpen} onClose={handleHistoryClose}>
           <Box
             position="absolute"
             top="50%"
             left="50%"
-            width={400}
+            width={600}
             bgcolor="white"
             border="2px solid #000"
             boxShadow={24}
@@ -337,22 +393,64 @@ export default function Home() {
             flexDirection="column"
             gap={3}
             sx={{
-              transform: "translate(-50%, -50%)"
+              transform: "translate(-50%, -50%)",
+              maxHeight: "80vh",
+              overflowY: "auto"
             }}
           >
-            <Typography variant="h6">Confirm Remove</Typography>
-            <Typography>
-              Removing this item will delete it from the inventory since its quantity is 1.
-              Are you sure you want to proceed?
+            <Typography variant="h5" textAlign="center">
+              History for {selectedItemHistory?.name}
             </Typography>
-            <Stack direction="row" spacing={2} justifyContent="flex-end">
-              <Button variant="outlined" onClick={handleRemoveCancel}>
-                Cancel
-              </Button>
-              <Button variant="contained" color="error" onClick={handleRemoveConfirm}>
-                Remove
-              </Button>
+            <Stack spacing={2}>
+              {selectedItemHistory?.history.map((entry) => (
+                <Box
+                  key={entry.id}
+                  sx={{
+                    border: "1px solid #ddd",
+                    borderRadius: 1,
+                    p: 2
+                  }}
+                >
+                  <Typography variant="subtitle2" color="text.secondary">
+                    {new Date(entry.timestamp).toLocaleString()} by {entry.by}
+                  </Typography>
+                  <Typography variant="subtitle1" fontWeight="bold">
+                    {entry.action === "create" ? "Created" :
+                     entry.action === "update" ? "Updated" :
+                     entry.action === "rename" ? "Renamed" : "Modified"}
+                  </Typography>
+                  {entry.action === "rename" ? (
+                    <Typography>New name: {entry.newName}</Typography>
+                  ) : (
+                    <Stack spacing={1} mt={1}>
+                      <Typography variant="body2">
+                        Quantity: {entry.changes.quantity}
+                      </Typography>
+                      <Typography variant="body2">
+                        Room: {entry.changes.roomLocation}
+                      </Typography>
+                      {entry.changes.boxNumber && (
+                        <Typography variant="body2">
+                          Box: {entry.changes.boxNumber}
+                        </Typography>
+                      )}
+                      {entry.changes.notes && (
+                        <Typography variant="body2">
+                          Notes: {entry.changes.notes}
+                        </Typography>
+                      )}
+                    </Stack>
+                  )}
+                </Box>
+              ))}
             </Stack>
+            <Button
+              variant="contained"
+              onClick={handleHistoryClose}
+              sx={{ mt: 2 }}
+            >
+              Close
+            </Button>
           </Box>
         </Modal>
 
@@ -423,6 +521,15 @@ export default function Home() {
                 value={boxNumber}
                 onChange={(e) => setBoxNumber(e.target.value)}
               />
+              <TextField
+                label="Notes (optional)"
+                variant="outlined"
+                fullWidth
+                multiline
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
               <Button
                 variant="contained"
                 onClick={handleSave}
@@ -445,37 +552,64 @@ export default function Home() {
         </Button>
 
         {/* Inventory display section */}
-        <Box border="1px solid #333">
+        <Box
+          border="1px solid #333"
+          width="100%"
+          maxWidth="800px"
+          sx={{
+            mx: { xs: 1, sm: 2 }, // Smaller margin on mobile
+          }}
+        >
           {/* Inventory header */}
           <Box
-            width="800px"
-            height="100px"
             bgcolor="#ADD8E6"
             display="flex"
             flexDirection="column"
             justifyContent="center"
             alignItems="center"
             gap={2}
+            p={2}
           >
-            <Typography variant="h4">Inventory</Typography>
+            <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2.125rem' } }}>Inventory</Typography>
             <TextField
               placeholder="Search items..."
               variant="outlined"
               size="small"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ width: '300px', bgcolor: 'white' }}
+              sx={{
+                width: '100%',
+                maxWidth: '300px',
+                bgcolor: 'white'
+              }}
             />
+            {/* Add sort select */}
+            <Box sx={{ alignSelf: 'flex-end', minWidth: 120 }}>
+              <TextField
+                select
+                size="small"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                sx={{ bgcolor: 'white' }}
+                SelectProps={{
+                  native: true,
+                }}
+              >
+                <option value="name">Sort by Name</option>
+                <option value="room">Sort by Room</option>
+                <option value="quantity">Sort by Quantity</option>
+                <option value="recent">Sort by Recently Added/Modified</option>
+              </TextField>
+            </Box>
           </Box>
-          {/* Inventory items */}
+          {/* Inventory items - apply sorting */}
           <Box
-            width="800px"
             maxHeight="500px"
             overflow="auto"
             display="flex"
             flexDirection="column"
           >
-            {inventory
+            {getSortedInventory(inventory)
               .filter(item =>
                 item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.roomLocation.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -485,43 +619,96 @@ export default function Home() {
                 <Box
                   key={item.name}
                   display="flex"
+                  flexDirection={{ xs: 'column', sm: 'row' }}
                   justifyContent="space-between"
-                  alignItems="center"
+                  alignItems={{ xs: 'stretch', sm: 'flex-start' }}
                   p={2}
                   borderBottom="1px solid #333"
+                  gap={2}
                 >
-                  <Box>
-                    <Typography variant="subtitle1" fontWeight="bold">{item.name}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Room: {item.roomLocation}
-                      {item.boxNumber && ` • Box: ${item.boxNumber}`}
+                  <Box flex={1}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                      {item.name}
                     </Typography>
+                    <Stack spacing={1}>
+                      <Box 
+                        sx={{
+                          bgcolor: 'rgba(0, 0, 0, 0.03)',
+                          p: 1,
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography variant="body2" color="text.primary" component="div">
+                          <strong>Room:</strong> {item.roomLocation}
+                        </Typography>
+                        {item.boxNumber && (
+                          <Typography variant="body2" color="text.primary" component="div">
+                            <strong>Box:</strong> {item.boxNumber}
+                          </Typography>
+                        )}
+                        {item.notes && (
+                          <Typography variant="body2" color="text.primary" component="div">
+                            <strong>Notes:</strong> {item.notes}
+                          </Typography>
+                        )}
+                      </Box>
+                    </Stack>
                   </Box>
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <Typography>Quantity: {item.quantity}</Typography>
-                    <Stack direction="row" spacing={1}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      alignItems: { xs: 'stretch', sm: 'center' },
+                      gap: 1,
+                      minWidth: { sm: '300px' },
+                      justifyContent: { xs: 'flex-start', sm: 'flex-end' }
+                    }}
+                  >
+                    <Typography 
+                      sx={{ 
+                        textAlign: { xs: 'left', sm: 'right' },
+                        mb: { xs: 1, sm: 0 }
+                      }}
+                    >
+                      Quantity: {item.quantity} {item.quantity === 1 && "(1 is broken)"}
+                    </Typography>
+                    <Stack 
+                      direction={{ xs: 'column', sm: 'row' }} 
+                      spacing={1}
+                      sx={{ 
+                        width: { xs: '100%', sm: 'auto' }
+                      }}
+                    >
                       <Button
                         variant="outlined"
                         color="primary"
                         onClick={() => handleEdit(item)}
+                        fullWidth
+                        size="small"
                       >
                         Edit
                       </Button>
                       <Button
                         variant="outlined"
                         color="error"
-                        onClick={() => {
-                          removeItem(item.name)
-                        }}
+                        onClick={() => handleDeleteConfirm(item)}
+                        fullWidth
+                        size="small"
                       >
-                        Remove
+                        Delete
                       </Button>
                       <Button
                         variant="outlined"
-                        color="error"
-                        onClick={() => handleDeleteConfirm(item)}
+                        color="info"
+                        onClick={() => handleHistoryClick(item)}
+                        size="small"
+                        sx={{
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0
+                        }}
                       >
-                        Delete All
+                        <GoHistory />
                       </Button>
                     </Stack>
                   </Box>

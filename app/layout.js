@@ -16,15 +16,18 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: 'STEM Academy Inventory',
   description: 'Inventory Management App for STEM Heroes Academy',
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 }
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}>
         <Providers>
           <Header />
-          {children}
+          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            {children}
+          </main>
         </Providers>
       </body>
     </html>
