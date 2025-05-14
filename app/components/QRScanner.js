@@ -24,7 +24,7 @@ const QrScanner = ({ onScan }) => {
                 onScan(result.getText());
             }
             // Handle errors that aren't just "no QR code found"
-            if (err && !(err instanceof codeReader.NotFoundException)) {
+            if (err && err.message !== 'NotFoundException') {
                 setError('Error scanning QR code');
             }
         });

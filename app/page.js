@@ -32,6 +32,8 @@ export default function Home() {
   const [boxContents, setBoxContents] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [boxContentsModalOpen, setBoxContentsModalOpen] = useState(false);
 
   const roomLocations = [
     "Big Classroom (Pixel Place)",
@@ -142,7 +144,7 @@ export default function Home() {
       if (originalName !== itemName) {
         const oldDocRef = doc(collection(firestore, "inventory"), originalName)
         await deleteDoc(oldDocRef)
-        
+
         // Add history entry for deletion of old name
         const oldHistoryRef = doc(collection(firestore, `inventory/${originalName}/history`), new Date().toISOString())
         await setDoc(oldHistoryRef, {
@@ -231,13 +233,16 @@ export default function Home() {
     setBoxId(scannedId);
     setLoading(true);
     setError(null);
+    setQrModalOpen(false);
     const contents = await fetchBoxContents(scannedId);
     setLoading(false);
     if (contents) {
       setBoxContents(contents);
+      setBoxContentsModalOpen(true);
     } else {
       setBoxContents(null);
       setError('No contents found for this box.');
+      setBoxContentsModalOpen(true);
     }
   };
 
@@ -435,8 +440,8 @@ export default function Home() {
                   </Typography>
                   <Typography variant="subtitle1" fontWeight="bold">
                     {entry.action === "create" ? "Created" :
-                     entry.action === "update" ? "Updated" :
-                     entry.action === "rename" ? "Renamed" : "Modified"}
+                      entry.action === "update" ? "Updated" :
+                        entry.action === "rename" ? "Renamed" : "Modified"}
                   </Typography>
                   {entry.action === "rename" ? (
                     <Typography>New name: {entry.newName}</Typography>
@@ -602,14 +607,33 @@ export default function Home() {
                 bgcolor: 'white'
               }}
             />
-            {/* Add sort select */}
-            <Box sx={{ alignSelf: 'flex-end', minWidth: 120 }}>
+            {/* Row for QR scan button (left) and sort dropdown (right) */}
+            <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'space-between', gap: 1 }}>
+              <Button
+                variant="contained"
+                onClick={() => setQrModalOpen(true)}
+                sx={{
+                  borderRadius: '50%',
+                  minWidth: '40px',
+                  width: '40px',
+                  height: '40px',
+                  padding: 0,
+                  backgroundColor: '#43a047',
+                  color: 'white',
+                  '&:hover': {
+                    backgroundColor: '#388e3c',
+                  }
+                }}
+                aria-label="Scan QR Code"
+              >
+                📷
+              </Button>
               <TextField
                 select
                 size="small"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                sx={{ bgcolor: 'white' }}
+                sx={{ bgcolor: 'white', minWidth: 120 }}
                 SelectProps={{
                   native: true,
                 }}
@@ -650,7 +674,7 @@ export default function Home() {
                       {item.name}
                     </Typography>
                     <Stack spacing={1}>
-                      <Box 
+                      <Box
                         sx={{
                           bgcolor: 'rgba(0, 0, 0, 0.03)',
                           p: 1,
@@ -683,18 +707,18 @@ export default function Home() {
                       justifyContent: { xs: 'flex-start', sm: 'flex-end' }
                     }}
                   >
-                    <Typography 
-                      sx={{ 
+                    <Typography
+                      sx={{
                         textAlign: { xs: 'left', sm: 'right' },
                         mb: { xs: 1, sm: 0 }
                       }}
                     >
                       Quantity: {item.quantity} {item.quantity === 1 && "(1 is broken)"}
                     </Typography>
-                    <Stack 
-                      direction={{ xs: 'column', sm: 'row' }} 
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
                       spacing={1}
-                      sx={{ 
+                      sx={{
                         width: { xs: '100%', sm: 'auto' }
                       }}
                     >
@@ -736,35 +760,71 @@ export default function Home() {
           </Box>
         </Box>
 
-        {/* Scan a Box QR Code section */}
-        <Box mt={4} p={2} border="1px solid #333" borderRadius={4} width="100%" maxWidth={600}>
-          <Typography variant="h5" gutterBottom>Scan a Box QR Code</Typography>
-          {!boxId && <QrScanner onScan={handleScan} />}
-          {loading && <p>Loading box contents...</p>}
-          {error && <p style={{ color: 'red' }}>{error}</p>}
-          {boxContents && (
-            <div>
-              <h2>Contents of Box: {boxId}</h2>
-              <ul>
+        {/* QR Scanner Modal */}
+        <Modal open={qrModalOpen} onClose={() => setQrModalOpen(false)}>
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            width={400}
+            bgcolor="white"
+            border="2px solid #000"
+            boxShadow={24}
+            p={4}
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            sx={{ transform: 'translate(-50%, -50%)' }}
+          >
+            <Typography variant="h5" gutterBottom>Scan a Box QR Code</Typography>
+            <QrScanner onScan={handleScan} />
+            <Button onClick={() => setQrModalOpen(false)} sx={{ mt: 2 }}>Cancel</Button>
+          </Box>
+        </Modal>
+
+        {/* Box Contents Modal */}
+        <Modal open={boxContentsModalOpen} onClose={() => {
+          setBoxContentsModalOpen(false);
+          setBoxId(null);
+          setBoxContents(null);
+          setError(null);
+        }}>
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            width={400}
+            bgcolor="white"
+            border="2px solid #000"
+            boxShadow={24}
+            p={4}
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            sx={{ transform: 'translate(-50%, -50%)' }}
+          >
+            <Typography variant="h5" gutterBottom>Contents of Box: {boxId}</Typography>
+            {loading && <p>Loading box contents...</p>}
+            {error && <p style={{ color: 'red' }}>{error}</p>}
+            {boxContents && (
+              <ul style={{ width: '100%' }}>
                 {boxContents.map((item, idx) => (
-                  <li key={idx}>
+                  <li key={idx} style={{ marginBottom: 8 }}>
                     <strong>{item.name}</strong> (Qty: {item.quantity})<br />
                     Room: {item.roomLocation}<br />
                     {item.notes && <span>Notes: {item.notes}<br /></span>}
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
-          {boxId && !boxContents && !loading && !error && (
-            <p>No contents found for this box.</p>
-          )}
-          {boxId && (
-            <button onClick={() => { setBoxId(null); setBoxContents(null); setError(null); }} style={{ marginTop: 16 }}>
-              Scan Another Box
-            </button>
-          )}
-        </Box>
+            )}
+            <Button onClick={() => {
+              setBoxContentsModalOpen(false);
+              setBoxId(null);
+              setBoxContents(null);
+              setError(null);
+            }} sx={{ mt: 2 }}>Close</Button>
+          </Box>
+        </Modal>
       </SignedIn>
     </Box>
   )
