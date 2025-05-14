@@ -6,6 +6,7 @@ import { Box, Button, Modal, Stack, TextField, Typography, Autocomplete } from "
 import { collection, deleteDoc, doc, getDocs, query, getDoc, setDoc } from "firebase/firestore"
 import { SignedIn, SignedOut, useUser } from "@clerk/nextjs"
 import { GoHistory } from "react-icons/go"
+import QrScanner from './components/QRScanner';
 
 export default function Home() {
   // State management for inventory items, modal visibility, and new item name
@@ -27,6 +28,10 @@ export default function Home() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false)
   const [selectedItemHistory, setSelectedItemHistory] = useState(null)
   const { user } = useUser()
+  const [boxId, setBoxId] = useState(null);
+  const [boxContents, setBoxContents] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const roomLocations = [
     "Big Classroom (Pixel Place)",
@@ -221,6 +226,20 @@ export default function Home() {
       }
     })
   }
+
+  const handleScan = async (scannedId) => {
+    setBoxId(scannedId);
+    setLoading(true);
+    setError(null);
+    const contents = await fetchBoxContents(scannedId);
+    setLoading(false);
+    if (contents) {
+      setBoxContents(contents);
+    } else {
+      setBoxContents(null);
+      setError('No contents found for this box.');
+    }
+  };
 
   return (
     <Box
@@ -716,7 +735,56 @@ export default function Home() {
               ))}
           </Box>
         </Box>
+
+        {/* Scan a Box QR Code section */}
+        <Box mt={4} p={2} border="1px solid #333" borderRadius={4} width="100%" maxWidth={600}>
+          <Typography variant="h5" gutterBottom>Scan a Box QR Code</Typography>
+          {!boxId && <QrScanner onScan={handleScan} />}
+          {loading && <p>Loading box contents...</p>}
+          {error && <p style={{ color: 'red' }}>{error}</p>}
+          {boxContents && (
+            <div>
+              <h2>Contents of Box: {boxId}</h2>
+              <ul>
+                {boxContents.map((item, idx) => (
+                  <li key={idx}>
+                    <strong>{item.name}</strong> (Qty: {item.quantity})<br />
+                    Room: {item.roomLocation}<br />
+                    {item.notes && <span>Notes: {item.notes}<br /></span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {boxId && !boxContents && !loading && !error && (
+            <p>No contents found for this box.</p>
+          )}
+          {boxId && (
+            <button onClick={() => { setBoxId(null); setBoxContents(null); setError(null); }} style={{ marginTop: 16 }}>
+              Scan Another Box
+            </button>
+          )}
+        </Box>
       </SignedIn>
     </Box>
   )
 }
+
+// Replace the mock fetchBoxContents with a real Firestore query
+const fetchBoxContents = async (boxId) => {
+  // Fetch all inventory items
+  const snapshot = query(collection(firestore, "inventory"));
+  const docs = await getDocs(snapshot);
+  // Filter items whose boxNumber matches the scanned boxId
+  const itemsInBox = [];
+  docs.forEach((doc) => {
+    const data = doc.data();
+    if (data.boxNumber && data.boxNumber.toString().toLowerCase() === boxId.toString().toLowerCase()) {
+      itemsInBox.push({
+        name: doc.id,
+        ...data
+      });
+    }
+  });
+  return itemsInBox.length > 0 ? itemsInBox : null;
+};
